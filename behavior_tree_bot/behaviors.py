@@ -46,6 +46,55 @@ def spread_to_weakest_neutral_planet(state):
 
 # custom behavior
 
-def counter_enemy_attack_on_neutral(state):
-    # TODO
+from behavior_tree_bot.checks import just_taken_planets
+
+# we may also want to use this functionality for ally planets too, so
+# if the enemy takes an allied planet, we can ambush them immediately afterwards
+def ambush_enemy_on_take_neutral(state):
+    # take next taken planet off queue to process
+    # note that we may want to push this planet back onto the just_taken queue if we choose
+    # not to ambush it, as it could be that in a few turns we have a large enough arsenal to launch
+    # a delayed ambush, but for now we can just stick with this
+    just_taken_id = just_taken_planets.pop()
+
+    # find planet in enemy planets
+    taken_planet = None
+    
+    for planet in state.enemy_planets():
+        if planet.ID == just_taken_id:
+            taken_planet = planet
+            break
+
+    # just taken planet not found?
+    # havent ecountered this yet, but if it happens something catastrophic happened
+    if taken_planet == None:
+        logging.info('taken planet not found with ID ' + str(just_taken_id))
+        return False
+
+    # now we need to sort our planets by ship count and distance to the taken planet
+    planets = state.my_planets()
+    planets.sort(key=lambda p: (state.distance(p.ID, taken_planet.ID), p.num_ships))
+
+    # we can take the top planet for now, although we may want to add an additional heuristic to see
+    # if other ally planets have significantly more ships at the cost of further distance
+    offense_planet = planets[0]
+    distance_to_target = state.distance(offense_planet.ID, taken_planet.ID)
+
+    # tunable numbers
+    ambush_safety_buffer = 0.20 # extra ships to help secure defense after taking a planet
+    offense_planet_safety = 0.50 # we should never send more than this amount of offensive planet's ship count
+
+    # for now, ill assume we need target-planet ship count + 20% to take it over effectively
+    # this also accounts for how long it will take our ships to reach the destination, and the growth
+    # rate of the target planet
+    taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
+    needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+
+    # next, we can decide if the number of ships difference < 50%
+    if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
+        logging.info('AMBUSHING PLANET: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+        return issue_order(state, offense_planet.ID, taken_planet.ID, needed_ships)
+    else:
+        logging.info('not ambushing planet: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+
     return False
