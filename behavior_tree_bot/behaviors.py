@@ -98,3 +98,28 @@ def ambush_enemy_on_take_neutral(state):
         logging.info('not ambushing planet: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
 
     return False
+
+# Custom behavior to defend planets
+
+def defend_planets(state):
+    for fleet in state.enemy_fleets():
+        # Check if this fleet was just launched
+        if fleet.turns_remaining == fleet.total_trip_length:
+            target_planet = next((p for p in state.planets if p.ID == fleet.destination_planet), None)
+            
+            # Check if the target planet is ours
+            if target_planet and target_planet.owner == 1:
+                # Calculate how many ships we need to defend
+                ships_needed = fleet.num_ships + 1
+                
+                # Find the closest planet that can send enough ships
+                potential_defenders = sorted(state.my_planets(), 
+                                             key=lambda p: state.distance(p.ID, target_planet.ID))
+                
+                for defender in potential_defenders:
+                    if defender.num_ships > ships_needed:
+                        # Send ships to defend
+                        logging.info(f'Defending planet {target_planet.ID} from attack. Sending {ships_needed} ships from planet {defender.ID}')
+                        return issue_order(state, defender.ID, target_planet.ID, ships_needed)
+    
+    return False

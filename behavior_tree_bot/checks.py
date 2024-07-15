@@ -57,3 +57,16 @@ def enemy_just_took_neutral(state):
         return True
     else:
         return False
+        
+
+#Used to defend an allied planet if enemy launches an attack
+
+def enemy_attacking(state):
+    logging.info("Checking for enemy attacks...")
+    for fleet in state.enemy_fleets():
+        # Check if this fleet was just launched (turns_remaining == total_trip_length)
+        if fleet.turns_remaining == fleet.total_trip_length:
+            logging.info(f"Enemy attack detected! Fleet of {fleet.num_ships} ships heading to planet {fleet.destination_planet}")
+            return True
+    logging.info("No enemy attacks detected.")
+    return False
