@@ -63,10 +63,18 @@ def enemy_just_took_neutral(state):
 
 def enemy_attacking(state):
     logging.info("Checking for enemy attacks...")
+    logging.info(f"Number of enemy fleets: {len(state.enemy_fleets())}")
+    
     for fleet in state.enemy_fleets():
-        # Check if this fleet was just launched (turns_remaining == total_trip_length)
-        if fleet.turns_remaining == fleet.total_trip_length:
-            logging.info(f"Enemy attack detected! Fleet of {fleet.num_ships} ships heading to planet {fleet.destination_planet}")
+        logging.info(f"Enemy fleet: ships={fleet.num_ships}, " +
+                     f"destination={fleet.destination_planet}, " +
+                     f"turns_remaining={fleet.turns_remaining}, " +
+                     f"total_trip_length={fleet.total_trip_length}")
+        
+        if fleet.turns_remaining >= fleet.total_trip_length - 2:
+            logging.info(f"Enemy attack detected! Fleet of {fleet.num_ships} " +
+                         f"ships heading to planet {fleet.destination_planet}")
             return True
+    
     logging.info("No enemy attacks detected.")
     return False

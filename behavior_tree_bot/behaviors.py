@@ -103,23 +103,40 @@ def ambush_enemy_on_take_neutral(state):
 
 def defend_planets(state):
     for fleet in state.enemy_fleets():
-        # Check if this fleet was just launched
+        # Check if this fleet was launched recently
         if fleet.turns_remaining == fleet.total_trip_length:
+            logging.info(f"Potential attack detected: Fleet of {fleet.num_ships} ships heading to planet {fleet.destination_planet}")
+            
             target_planet = next((p for p in state.planets if p.ID == fleet.destination_planet), None)
             
+            if not target_planet:
+                logging.info(f"Target planet {fleet.destination_planet} not found")
+                continue
+            
+            logging.info(f"Target planet {target_planet.ID} owner: {target_planet.owner}")
+            
             # Check if the target planet is ours
-            if target_planet and target_planet.owner == 1:
+            if target_planet.owner == 1:
                 # Calculate how many ships we need to defend
                 ships_needed = fleet.num_ships + 1
+                logging.info(f"Ships needed to defend: {ships_needed}")
                 
                 # Find the closest planet that can send enough ships
                 potential_defenders = sorted(state.my_planets(), 
                                              key=lambda p: state.distance(p.ID, target_planet.ID))
                 
+                logging.info(f"Number of potential defender planets: {len(potential_defenders)}")
+                
                 for defender in potential_defenders:
+                    logging.info(f"Potential defender planet {defender.ID} has {defender.num_ships} ships")
                     if defender.num_ships > ships_needed:
                         # Send ships to defend
                         logging.info(f'Defending planet {target_planet.ID} from attack. Sending {ships_needed} ships from planet {defender.ID}')
                         return issue_order(state, defender.ID, target_planet.ID, ships_needed)
+                
+                logging.info("No suitable defender planet found")
+            else:
+                logging.info(f"Planet {target_planet.ID} is not ours, not defending")
     
+    logging.info("No planets to defend")
     return False
