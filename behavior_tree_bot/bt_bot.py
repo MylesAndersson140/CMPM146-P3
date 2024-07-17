@@ -28,11 +28,18 @@ def setup_behavior_tree():
 
     # default behaviors
 
+    # Temp offensive strat
+    offensive_plan = Sequence(name='Offensive Strategy')
+    largest_fleet_check = Check(have_largest_fleet)
+    attack = Action(attack_weakest_planet_in_proximity)
+    offensive_plan.child_nodes = [largest_fleet_check, attack]
+
+    '''
     offensive_plan = Sequence(name='Offensive Strategy')
     largest_fleet_check = Check(have_largest_fleet)
     attack = Action(attack_weakest_enemy_planet)
     offensive_plan.child_nodes = [largest_fleet_check, attack]
-
+    '''
     spread_sequence = Sequence(name='Spread Strategy')
     neutral_planet_check = Check(if_neutral_planet_available)
     spread_action = Action(spread_to_weakest_neutral_planet)
