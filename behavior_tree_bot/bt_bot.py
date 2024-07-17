@@ -52,6 +52,11 @@ def setup_behavior_tree():
     ambush = Action(ambush_enemy_on_take_neutral)
     clean_ambush.child_nodes = [enemy_took_neutral_check, ambush]
 
+    ambush_takeback = Sequence(name='Ambush Takeback')
+    enemy_took_ally_check = Check(enemy_just_took_ally)
+    takeback = Action(ambush_enemy_on_take_ally)
+    ambush_takeback.child_nodes = [enemy_took_ally_check, takeback]
+
     # planet defense
     defensive_plan = Sequence(name='Defensive Strategy')
     enemy_attack_check = Check(enemy_attacking)
@@ -66,7 +71,7 @@ def setup_behavior_tree():
 
     # register to behavior tree
 
-    root.child_nodes = [clean_ambush, defensive_plan, offensive_plan, distribution_plan, spread_sequence]#, attack.copy()]
+    root.child_nodes = [ambush_takeback, clean_ambush, defensive_plan, offensive_plan, distribution_plan, spread_sequence]
 
     logging.info('\n' + root.tree_to_string())
     return root

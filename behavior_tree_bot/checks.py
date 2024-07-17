@@ -57,8 +57,38 @@ def enemy_just_took_neutral(state):
         return True
     else:
         return False
-        
 
+# ambush take back ally planets
+
+ally_planets = []
+just_taken_allies = []
+
+def enemy_just_took_ally(state):
+    state_allies = state.my_planets()
+
+    # track any ally planets we weren't tracking before
+    for planet in state_allies:
+        if planet not in ally_planets:
+            ally_planets.append(planet)
+
+    enemy_planets = state.enemy_planets()
+    
+    # find any planets that were neutral but are no longer neutral and now owned by the enemy
+    for planet in ally_planets:
+        if planet not in state_allies: # planet no longer neutral
+            # search enemy list, and add planet ID if found
+            for enemy_planet in enemy_planets:
+                if enemy_planet.ID == planet.ID:
+                    just_taken_allies.append(planet.ID)
+
+            # remove it from our neutral list
+            ally_planets.remove(planet)
+
+    if len(just_taken_allies) > 0:
+        return True
+    else:
+        return False
+        
 #Used to defend an allied planet if enemy launches an attack
 
 def enemy_attacking(state):

@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, '../')
 from planet_wars import issue_order
 import logging
+from math import ceil
 
 # sample behaviors
 
@@ -46,7 +47,7 @@ def spread_to_weakest_neutral_planet(state):
 
 # custom behavior
 
-from behavior_tree_bot.checks import just_taken_planets
+from behavior_tree_bot.checks import just_taken_planets, just_taken_allies
 
 # modified spread (favor close by neutrals)
 # using a scoring system to find the most favorable move
@@ -73,21 +74,30 @@ def spread_to_weakest_neutral_planet(state):
         neutrals.sort(key=lambda p: (p.num_ships, state.distance(p.ID, planet.ID)))
 
         for neutral in neutrals:
+            already_ship = False
+            for fleet in state.my_fleets():
+                if fleet.destination_planet == neutral.ID:
+                    already_ship = True
+                    break
+
+            if already_ship:
+                continue
+            
             dist = state.distance(planet.ID, neutral.ID)
 
             # cap the furthest an attack can be made
-            if dist > 13:
+            if dist > 7:
                 continue
             
-            num_ships = neutral.num_ships + (neutral.num_ships * 0.20)
+            num_ships = neutral.num_ships + (neutral.num_ships * 0.50)
 
             # make sure the planet doesnt send more than 35% of its ships
             if planet.num_ships - num_ships <= planet.num_ships * 0.65:
                 continue
 
-            score = 5 / (planet.num_ships - num_ships) + dist
+            score = 1 / (planet.num_ships - num_ships) + dist
 
-            scores.append((score, planet.ID, neutral.ID, num_ships))
+            scores.append((score, planet.ID, neutral.ID, ceil(num_ships)))
 
     scores.sort()
 
@@ -123,29 +133,66 @@ def ambush_enemy_on_take_neutral(state):
 
     # now we need to sort our planets by ship count and distance to the taken planet
     planets = state.my_planets()
-    planets.sort(key=lambda p: (-state.distance(p.ID, taken_planet.ID), p.num_ships))
+    planets.sort(key=lambda p: (state.distance(p.ID, taken_planet.ID), 1 / (p.num_ships if p.num_ships > 0 else 1)))
 
-    # we can take the top planet for now, although we may want to add an additional heuristic to see
-    # if other ally planets have significantly more ships at the cost of further distance
-    offense_planet = planets[0]
-    distance_to_target = state.distance(offense_planet.ID, taken_planet.ID)
+    for offense_planet in planets:
+        distance_to_target = state.distance(offense_planet.ID, taken_planet.ID)
 
-    # tunable numbers
-    ambush_safety_buffer = 0.20 # extra ships to help secure defense after taking a planet
-    offense_planet_safety = 0.50 # we should never send more than this amount of offensive planet's ship count
+        if distance_to_target > 10:
+            return False
 
-    # for now, ill assume we need target-planet ship count + 20% to take it over effectively
-    # this also accounts for how long it will take our ships to reach the destination, and the growth
-    # rate of the target planet
-    taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
-    needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+        # tunable numbers
+        ambush_safety_buffer = 0.20 # extra ships to help secure defense after taking a planet
+        offense_planet_safety = 0.50 # we should never send more than this amount of offensive planet's ship count
 
-    # next, we can decide if the number of ships difference < 50%
-    if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
-        logging.info('AMBUSHING PLANET: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
-        return issue_order(state, offense_planet.ID, taken_planet.ID, needed_ships)
-    else:
-        logging.info('not ambushing planet: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+        # for now, ill assume we need target-planet ship count + 20% to take it over effectively
+        # this also accounts for how long it will take our ships to reach the destination, and the growth
+        # rate of the target planet
+        taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
+        needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+
+        # next, we can decide if the number of ships difference < 50%
+        if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
+            logging.info('AMBUSHING PLANET: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+            return issue_order(state, offense_planet.ID, taken_planet.ID, needed_ships)
+        else:
+            logging.info('not ambushing planet: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+
+    return False
+
+
+def ambush_enemy_on_take_ally(state):
+    just_taken_id = just_taken_allies.pop()
+
+    taken_planet = None
+    
+    for planet in state.enemy_planets():
+        if planet.ID == just_taken_id:
+            taken_planet = planet
+            break
+
+    if taken_planet == None:
+        logging.info('taken planet not found with ID ' + str(just_taken_id))
+        return False
+
+    planets = state.my_planets()
+    planets.sort(key=lambda p: (state.distance(p.ID, taken_planet.ID), 1 / (p.num_ships if p.num_ships > 0 else 1)))
+
+    for offense_planet in planets:
+        distance_to_target = state.distance(offense_planet.ID, taken_planet.ID)
+
+        # tunable numbers
+        ambush_safety_buffer = 0.20 # extra ships to help secure defense after taking a planet
+        offense_planet_safety = 0.50 # we should never send more than this amount of offensive planet's ship count
+
+        taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
+        needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+
+        if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
+            logging.info('AMBUSHING PLANET: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
+            return issue_order(state, offense_planet.ID, taken_planet.ID, needed_ships)
+        else:
+            logging.info('not ambushing planet: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
 
     return False
 
@@ -204,23 +251,33 @@ def distribute_ships(state):
 
     logging.info('at least 2 planets')
 
-    weakest_planet = planets[0]
-    planets.remove(weakest_planet)
+    for weakest_planet in planets:
+        planets.remove(weakest_planet)
 
-    logging.info('weakest planet has ' + str(weakest_planet.num_ships) + ' ships')
+        already_dist = False
+        for fleet in state.my_fleets():
+            if fleet.destination_planet == weakest_planet.ID:
+                already_dist = True
+                break
 
-    planets.sort(key=lambda p: state.distance(weakest_planet.ID, p.ID))
+        if already_dist:
+            continue
 
-    for planet in planets:
-        dist = state.distance(planet.ID, weakest_planet.ID)
-        ships_to_send = planet.num_ships / 2 - (weakest_planet.num_ships + weakest_planet.growth_rate * dist)
+        logging.info('weakest planet has ' + str(weakest_planet.num_ships) + ' ships')
 
-        logging.info('need to send ' + str(ships_to_send) + '/' + str(planet.num_ships) + ' ships (' + str(dist) + ') with ' + str(weakest_planet.num_ships) + ' ships')
+        planets.sort(key=lambda p: state.distance(weakest_planet.ID, p.ID))
 
-        if ships_to_send >= 1:
-            logging.info('distributing')
+        for planet in planets:
+            dist = state.distance(planet.ID, weakest_planet.ID)
+            ships_to_send = planet.num_ships / 2 - (weakest_planet.num_ships + weakest_planet.growth_rate * dist)
 
-            return issue_order(state, planet.ID, weakest_planet.ID, ships_to_send)
+            logging.info('need to send ' + str(ships_to_send) + '/' + str(planet.num_ships) + ' ships (' + str(dist) + ') with ' + str(weakest_planet.num_ships) + ' ships')
+
+
+            if ships_to_send >= 1:
+                logging.info('distributing')
+
+                return issue_order(state, planet.ID, weakest_planet.ID, ships_to_send)
 
     return False
 
@@ -255,19 +312,29 @@ def attack_weakest_planet_in_proximity(state):
             continue
         
         # Find the weakest nearby planet
-        target_planet = min(nearby_targets, 
-                            key=lambda p: effective_strength(state, my_planet, p))
+        # target_planet = min(nearby_targets, 
+                            # key=lambda p: effective_strength(state, my_planet, p))
+
+        for target_planet in nearby_targets:
+            already_attacking = False
+            for fleet in state.my_fleets():
+                if fleet.destination_planet == target_planet.ID:
+                    already_attacking = True
+                    break
+
+            if already_attacking:
+                continue
+            
+            # Number of ships needed for a successful attack
+            ships_needed = effective_strength(state, my_planet, target_planet) * 1.20
         
-        # Number of ships needed for a successful attack
-        ships_needed = effective_strength(state, my_planet, target_planet) + 1
+            # Check if we have enough ships to attack while maintaining a proper defense.
+            available_ships = my_planet.num_ships * (1 - reserves)
         
-        # Check if we have enough ships to attack while maintaining a proper defense.
-        available_ships = my_planet.num_ships * (1 - reserves)
-        
-        if available_ships > ships_needed:
-            logging.info(f"Attacking from planet {my_planet.ID} to {target_planet.ID} "
-                         f"(owner: {target_planet.owner}) with {ships_needed} ships")
-            return issue_order(state, my_planet.ID, target_planet.ID, ships_needed)
+            if available_ships > ships_needed:
+                logging.info(f"Attacking from planet {my_planet.ID} to {target_planet.ID} "
+                             f"(owner: {target_planet.owner}) with {ships_needed} ships")
+                return issue_order(state, my_planet.ID, target_planet.ID, ceil(ships_needed))
     
     logging.info("No suitable attacks found")
     return False
