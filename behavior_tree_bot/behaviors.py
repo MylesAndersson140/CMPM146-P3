@@ -195,3 +195,51 @@ def distribute_ships(state):
             return issue_order(state, planet.ID, weakest_planet.ID, ships_to_send)
 
     return False
+
+#Custom behavior to attack smallest enemy planet
+
+# Helper function to find the strength of a planet upon attack arrival.
+def effective_strength(state, my_planet, enemy_planet):
+    distance = state.distance(my_planet.ID, enemy_planet.ID)
+    growth_during_travel = enemy_planet.growth_rate * distance
+    return enemy_planet.num_ships + growth_during_travel
+
+# Function to attack the weakest enemy/neutral planet, accounts for distance, enemy growth rate, and defense.
+def attack_weakest_planet_in_proximity(state):
+    my_planets = state.my_planets()
+    enemy_planets = state.enemy_planets()
+    neutral_planets = state.neutral_planets()
+    
+    if not my_planets:
+        return False
+    
+    # Parameters (we can adjust these)
+    max_dist = 13  # Maximum distance to consider for attack
+    reserves = 0.5  # Proportion of ships to keep as reserve, Ive tried .4 and .6 and in both cases everything breaks LOL
+    
+    for my_planet in my_planets:
+        # Finding nearby planets that are eligable for attacking
+        nearby_targets = [p for p in enemy_planets + neutral_planets 
+                          if state.distance(my_planet.ID, p.ID) <= max_dist]
+        
+        if not nearby_targets:
+            # Nothing found
+            continue
+        
+        # Find the weakest nearby planet
+        target_planet = min(nearby_targets, 
+                            key=lambda p: effective_strength(state, my_planet, p))
+        
+        # Number of ships needed for a successful attack
+        ships_needed = effective_strength(state, my_planet, target_planet) + 1
+        
+        # Check if we have enough ships to attack while maintaining a proper defense.
+        available_ships = my_planet.num_ships * (1 - reserves)
+        
+        if available_ships > ships_needed:
+            logging.info(f"Attacking from planet {my_planet.ID} to {target_planet.ID} "
+                         f"(owner: {target_planet.owner}) with {ships_needed} ships")
+            return issue_order(state, my_planet.ID, target_planet.ID, ships_needed)
+    
+    logging.info("No suitable attacks found")
+    return False
