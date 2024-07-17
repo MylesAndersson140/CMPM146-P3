@@ -48,6 +48,28 @@ def spread_to_weakest_neutral_planet(state):
 
 from behavior_tree_bot.checks import just_taken_planets
 
+# modified spread (favor close by neutrals)
+
+def spread_to_weakest_neutral_planet(state):
+    # (1) If we currently have a fleet in flight, just do nothing.
+    # if len(state.my_fleets()) >= 1:
+        # return False
+
+    # (2) Find my strongest planet.
+    strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+
+    # (3) Find the weakest neutral planet.
+    # weakest_planet = min(state.neutral_planets(), key=lambda p: p.num_ships, default=None)
+    neutral_planets = state.neutral_planets()
+    neutral_planets.sort(key=lambda p: (p.num_ships, state.distance(p.ID, strongest_planet.ID)))
+
+    # if not strongest_planet or not weakest_planet:
+        # No legal source or destination
+        # return False
+    # else:
+        # (4) Send half the ships from my strongest planet to the weakest enemy planet.
+        # return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships / 2)
+
 # we may also want to use this functionality for ally planets too, so
 # if the enemy takes an allied planet, we can ambush them immediately afterwards
 def ambush_enemy_on_take_neutral(state):
@@ -73,7 +95,7 @@ def ambush_enemy_on_take_neutral(state):
 
     # now we need to sort our planets by ship count and distance to the taken planet
     planets = state.my_planets()
-    planets.sort(key=lambda p: (state.distance(p.ID, taken_planet.ID), p.num_ships))
+    planets.sort(key=lambda p: (-state.distance(p.ID, taken_planet.ID), p.num_ships))
 
     # we can take the top planet for now, although we may want to add an additional heuristic to see
     # if other ally planets have significantly more ships at the cost of further distance
@@ -139,4 +161,37 @@ def defend_planets(state):
                 logging.info(f"Planet {target_planet.ID} is not ours, not defending")
     
     logging.info("No planets to defend")
+    return False
+
+# ship distribution
+
+def distribute_ships(state):
+    planets = state.my_planets()
+    planets.sort(key=lambda p: (p.num_ships, p.growth_rate))
+
+    logging.info('checking for distribution')
+
+    if len(planets) < 2:
+        return False
+
+    logging.info('at least 2 planets')
+
+    weakest_planet = planets[0]
+    planets.remove(weakest_planet)
+
+    logging.info('weakest planet has ' + str(weakest_planet.num_ships) + ' ships')
+
+    planets.sort(key=lambda p: state.distance(weakest_planet.ID, p.ID))
+
+    for planet in planets:
+        dist = state.distance(planet.ID, weakest_planet.ID)
+        ships_to_send = planet.num_ships / 2 - (weakest_planet.num_ships + weakest_planet.growth_rate * dist)
+
+        logging.info('need to send ' + str(ships_to_send) + '/' + str(planet.num_ships) + ' ships (' + str(dist) + ') with ' + str(weakest_planet.num_ships) + ' ships')
+
+        if ships_to_send >= 1:
+            logging.info('distributing')
+
+            return issue_order(state, planet.ID, weakest_planet.ID, ships_to_send)
+
     return False

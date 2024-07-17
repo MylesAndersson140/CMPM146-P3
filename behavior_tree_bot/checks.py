@@ -78,3 +78,8 @@ def enemy_attacking(state):
     
     logging.info("No enemy attacks detected.")
     return False
+
+# always returns true
+
+def should_distribute_ships(state):
+    return True

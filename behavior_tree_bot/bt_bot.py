@@ -51,9 +51,15 @@ def setup_behavior_tree():
     defend = Action(defend_planets)
     defensive_plan.child_nodes = [enemy_attack_check, defend]
 
+    # ship distribution
+    distribution_plan = Sequence(name='Ship Distribution')
+    should_distribute = Check(should_distribute_ships)
+    send_ships = Action(distribute_ships)
+    distribution_plan.child_nodes = [should_distribute, send_ships]
+
     # register to behavior tree
 
-    root.child_nodes = [clean_ambush, defensive_plan, offensive_plan, spread_sequence, attack.copy()]
+    root.child_nodes = [clean_ambush, defensive_plan, offensive_plan, distribution_plan, spread_sequence]#, attack.copy()]
 
     logging.info('\n' + root.tree_to_string())
     return root
