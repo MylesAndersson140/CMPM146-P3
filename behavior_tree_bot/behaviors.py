@@ -298,10 +298,16 @@ def attack_weakest_planet_in_proximity(state):
     if not my_planets:
         return False
     
+    #Doesnt actually compute turn number, im just using it to determine how far away we should attack from.
+    #As ive noticed that the longer the game progresses, the higher this variable is, but caps out at around 80.
+    turn_number = len(state.enemy_fleets()) + len(state.my_fleets())
+    
     # Parameters (we can adjust these)
-    max_dist = 12 # Maximum distance to consider for attack
-    reserves = 0.2#91  # Proportion of ships to keep as reserve, Ive tried .4 and .6 and in both cases everything breaks LOL
+    max_dist = 30 if turn_number >= 45 else 12 # Maximum distance to consider for attack
+    reserves = 0.2  #91  # Proportion of ships to keep as reserve, Ive tried .4 and .6 and in both cases everything breaks LOL
     #0.2 works for test 1,2,3
+    logging.info(f"Current turn: {turn_number}, MAX_ATTACK_DISTANCE: {max_dist}")
+
     for my_planet in my_planets:
         # Finding nearby planets that are eligable for attacking
         nearby_targets = [p for p in enemy_planets + neutral_planets 
