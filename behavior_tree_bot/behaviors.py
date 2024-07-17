@@ -89,7 +89,7 @@ def spread_to_weakest_neutral_planet(state):
             if dist > 7:
                 continue
             
-            num_ships = neutral.num_ships + (neutral.num_ships * 0.50)
+            num_ships = ceil(neutral.num_ships + (neutral.num_ships * 0.50))
 
             # make sure the planet doesnt send more than 35% of its ships
             if planet.num_ships - num_ships <= planet.num_ships * 0.65:
@@ -97,7 +97,7 @@ def spread_to_weakest_neutral_planet(state):
 
             score = 1 / (planet.num_ships - num_ships) + dist
 
-            scores.append((score, planet.ID, neutral.ID, ceil(num_ships)))
+            scores.append((score, planet.ID, neutral.ID, num_ships))
 
     scores.sort()
 
@@ -149,7 +149,7 @@ def ambush_enemy_on_take_neutral(state):
         # this also accounts for how long it will take our ships to reach the destination, and the growth
         # rate of the target planet
         taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
-        needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+        needed_ships = ceil(taken_planet_ships + (taken_planet_ships * ambush_safety_buffer))
 
         # next, we can decide if the number of ships difference < 50%
         if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
@@ -186,7 +186,7 @@ def ambush_enemy_on_take_ally(state):
         offense_planet_safety = 0.50 # we should never send more than this amount of offensive planet's ship count
 
         taken_planet_ships = taken_planet.num_ships + (taken_planet.growth_rate * distance_to_target)
-        needed_ships = taken_planet_ships + (taken_planet_ships * ambush_safety_buffer)
+        needed_ships = ceil(taken_planet_ships + (taken_planet_ships * ambush_safety_buffer))
 
         if (offense_planet.num_ships - needed_ships) > (offense_planet.num_ships * offense_planet_safety):
             logging.info('AMBUSHING PLANET: ' + str(distance_to_target) + 'd away with ' + str(needed_ships) + ' ships (' + str(offense_planet.num_ships) + ' arsenal)')
@@ -269,7 +269,7 @@ def distribute_ships(state):
 
         for planet in planets:
             dist = state.distance(planet.ID, weakest_planet.ID)
-            ships_to_send = planet.num_ships / 2 - (weakest_planet.num_ships + weakest_planet.growth_rate * dist)
+            ships_to_send = ceil(planet.num_ships * 0.50 - (weakest_planet.num_ships + weakest_planet.growth_rate * dist))
 
             logging.info('need to send ' + str(ships_to_send) + '/' + str(planet.num_ships) + ' ships (' + str(dist) + ') with ' + str(weakest_planet.num_ships) + ' ships')
 
@@ -332,7 +332,7 @@ def attack_weakest_planet_in_proximity(state):
                 continue
             
             # Number of ships needed for a successful attack
-            ships_needed = effective_strength(state, my_planet, target_planet) * 1.20
+            ships_needed = ceil(effective_strength(state, my_planet, target_planet) * 1.20)
         
             # Check if we have enough ships to attack while maintaining a proper defense.
             available_ships = my_planet.num_ships * (1 - reserves)
