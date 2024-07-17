@@ -49,26 +49,54 @@ def spread_to_weakest_neutral_planet(state):
 from behavior_tree_bot.checks import just_taken_planets
 
 # modified spread (favor close by neutrals)
+# using a scoring system to find the most favorable move
 
 def spread_to_weakest_neutral_planet(state):
-    # (1) If we currently have a fleet in flight, just do nothing.
-    # if len(state.my_fleets()) >= 1:
-        # return False
+    offense = state.my_planets()
+    offense.sort(key=lambda p: (p.num_ships, p.growth_rate), reverse=True)
 
-    # (2) Find my strongest planet.
-    strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+    neutrals = state.neutral_planets()
 
-    # (3) Find the weakest neutral planet.
-    # weakest_planet = min(state.neutral_planets(), key=lambda p: p.num_ships, default=None)
-    neutral_planets = state.neutral_planets()
-    neutral_planets.sort(key=lambda p: (p.num_ships, state.distance(p.ID, strongest_planet.ID)))
+    scores = []
 
-    # if not strongest_planet or not weakest_planet:
-        # No legal source or destination
-        # return False
-    # else:
-        # (4) Send half the ships from my strongest planet to the weakest enemy planet.
-        # return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships / 2)
+    for planet in offense:
+        # make sure the offensive planet isnt currently under attack
+        under_attack = False
+        for fleet in state.enemy_fleets():
+            if fleet.destination_planet == planet:
+                under_attack = True
+                break
+
+        if under_attack:
+            continue
+
+        neutrals.sort(key=lambda p: (p.num_ships, state.distance(p.ID, planet.ID)))
+
+        for neutral in neutrals:
+            dist = state.distance(planet.ID, neutral.ID)
+
+            # cap the furthest an attack can be made
+            if dist > 13:
+                continue
+            
+            num_ships = neutral.num_ships + (neutral.num_ships * 0.20)
+
+            # make sure the planet doesnt send more than 35% of its ships
+            if planet.num_ships - num_ships <= planet.num_ships * 0.65:
+                continue
+
+            score = 5 / (planet.num_ships - num_ships) + dist
+
+            scores.append((score, planet.ID, neutral.ID, num_ships))
+
+    scores.sort()
+
+    if len(scores) == 0:
+        return False
+
+    (_, offense, target, ships) = scores[0];
+
+    return issue_order(state, offense, target, ships)
 
 # we may also want to use this functionality for ally planets too, so
 # if the enemy takes an allied planet, we can ambush them immediately afterwards
