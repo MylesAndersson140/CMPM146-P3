@@ -299,9 +299,9 @@ def attack_weakest_planet_in_proximity(state):
         return False
     
     # Parameters (we can adjust these)
-    max_dist = 13  # Maximum distance to consider for attack
-    reserves = 0.5  # Proportion of ships to keep as reserve, Ive tried .4 and .6 and in both cases everything breaks LOL
-    
+    max_dist = 12 # Maximum distance to consider for attack
+    reserves = 0.2#91  # Proportion of ships to keep as reserve, Ive tried .4 and .6 and in both cases everything breaks LOL
+    #0.2 works for test 1,2,3
     for my_planet in my_planets:
         # Finding nearby planets that are eligable for attacking
         nearby_targets = [p for p in enemy_planets + neutral_planets 
